@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Clash of Kings</title>
+<style>
+  :root{
+    --bg:#0e0f12; --panel:#171922; --line:#24283a; --ink:#e7ecf6; --muted:#9aa3b2;
+    --chip:#1f2338; --chipLine:#2a2f45; --accent:#2b64d6; --accent2:#64b5f6;
+    --gap:10px;
+
+    --headerPadV:12px; --headerPadH:12px; --controlFS:15px;
+
+    --pilesH:228px;
+    --logH:120px;
+
+    --cardW:72px; --cardH:104px; --rankFS:20px; --suitFS:18px;
+    --cardOutlineSel:3px; --cardOutlineHot:2px;
+
+    --btnMinW:46px; --btnPadV:8px; --btnPadH:12px;
+  }
+  @media (max-height:780px){ :root{ --pilesH:220px; --logH:110px; --cardW:70px; --cardH:100px; } }
+  @media (min-height:980px){ :root{ --pilesH:238px; --logH:128px; --cardW:76px; --cardH:110px; } }
+
+  *{box-sizing:border-box}
+  html,body{height:100%; overflow:hidden}
+  body{margin:0; height:100dvh; background:var(--bg); color:var(--ink);
+       font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif}
+  :focus-visible{outline:2px solid var(--accent2); outline-offset:2px}
+
+  #app{height:100dvh; display:grid; grid-template-rows:auto var(--pilesH) 1fr; overflow:hidden}
+
+  .bar{background:#121420; border-bottom:1px solid #22253a;
+       padding:calc(var(--headerPadV) + env(safe-area-inset-top,0px)) var(--headerPadH) var(--headerPadV);
+       box-shadow:0 2px 0 rgba(0,0,0,.15)}
+  .controls{display:flex; flex-wrap:wrap; align-items:center; gap:8px}
+  label{display:flex; align-items:center; gap:6px; font-size:var(--controlFS)}
+  select,button{background:#1a1d2a; border:1.5px solid var(--chipLine); color:#e7ecf6;
+                border-radius:12px; padding:var(--btnPadV) var(--btnPadH); font-size:var(--controlFS);
+                min-width:var(--btnMinW); cursor:pointer}
+  button:disabled{opacity:.6;cursor:not-allowed}
+  .spacer{flex:1 1 auto}
+
+  .startBtn{
+    background:#1f6f3f; border:1.5px solid #2a8f57; color:#eafff1;
+    border-radius:12px; padding:10px 14px; font-size:15px; min-width:70px;
+    cursor:pointer; margin-left:8px;
+  }
+  .startBtn:focus-visible{outline:2px solid #6fe3a1; outline-offset:2px}
+
+  .cta{font-size:17px; padding:10px 16px; min-width:78px; border-radius:14px}
+  .ctaRow{display:flex; gap:8px; align-items:center}
+  .primary{background:#2450a8; border-color:#2b64d6}
+  .primaryLight{background:#3a79ff; border-color:#6fa0ff}
+  .ghost{background:#1a1d2a; border-color:#2a2f45}
+
+  .info{
+    flex-basis:100%; max-width:100%;
+    background:#1a1d2a; border:1.5px solid var(--chipLine); border-radius:12px;
+    color:#e9efff; padding:8px 10px; font-size:15px; line-height:1.25;
+    white-space:normal; word-break:break-word;
+  }
+
+  .piles{display:flex; gap:var(--gap); padding:10px var(--headerPadH); overflow:hidden}
+  .col{flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:8px;
+       background:var(--panel); border:1.5px solid var(--line); border-radius:14px; padding:10px;}
+  h3{margin:0; font-size:15px; color:#c2c9db}
+  .pileBox{
+    border:1.5px dashed transparent; border-radius:12px; padding:10px; height:100%;
+    display:grid; grid-template-rows: var(--cardH) auto auto; row-gap:8px; align-items:start;
+  }
+  .pileBox.sel{border-color:#64b5f6}
+  .pileTop{display:flex; align-items:center; justify-content:center;}
+  .status{font-size:14px; color:#e4eaff; line-height:1.25}
+  .counts{font-size:13px; color:#aeb9d9}
+  .pill{display:inline-block; padding:2px 8px; border-radius:12px; background:#1f2338; border:1.5px solid #2a2f45; margin-left:6px; font-size:12px; color:#c7d3ff}
+
+  .bottom{display:flex; gap:var(--gap); padding:10px var(--headerPadH); overflow:hidden}
+  .handCol{flex:2 1 0; min-width:0; display:flex; flex-direction:column}
+  .logCol{flex:1 1 0; min-width:0; display:flex; flex-direction:column; justify-content:center}
+  .logHead{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px}
+  .log{flex:0 0 var(--logH); overflow:auto; font-size:13px; line-height:1.35; background:#141726; border:1.5px solid var(--line); border-radius:12px; padding:8px; margin:6px 0}
+
+  .handHead{display:flex; align-items:center; gap:8px}
+  .handHead h3{margin:0}
+  .handBadges{margin-left:auto; display:flex; gap:8px; align-items:center}
+  .small{font-size:12px; color:#9aa3b2}
+
+  .handViewport{position:relative; flex:1 1 auto; display:flex; align-items:center; justify-content:center;
+                overflow:hidden; min-height:calc(2 * var(--cardH) + 26px); margin-top:6px;}
+  .handGrid{display:grid; gap:10px; grid-template-columns:repeat(3, var(--cardW));
+            grid-auto-rows:var(--cardH); align-content:center; justify-content:center; width:100%;}
+  .handPager{display:flex; gap:10px; justify-content:center; align-items:center; margin-top:8px}
+  .navBtn{background:#1a1d2a; border:1.5px solid var(--chipLine); color:#e7ecf6; border-radius:10px; padding:6px 10px; min-width:44px; font-size:18px; line-height:1}
+  .navBtn:disabled{opacity:.4}
+
+  .card{width:var(--cardW); height:var(--cardH); border-radius:12px; background:#222534; border:1.5px solid #2b3150;
+        display:flex; align-items:center; justify-content:center; position:relative; user-select:none}
+  .rank{font-weight:800; font-size:var(--rankFS)}
+  .suit{position:absolute; bottom:6px; right:8px; font-size:var(--suitFS)}
+  .red{color:#ff6b6b} .black{color:#dfe7ff}
+  .clickable{outline:var(--cardOutlineHot) solid #2b63ff; cursor:pointer}
+  .chosen{outline:var(--cardOutlineSel) solid #7fd37f}
+  .disabled{opacity:.38; filter:saturate(.6); cursor:not-allowed}
+
+  .hint{font-size:13px; color:#9aa3b2; margin-top:6px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="bar">
+    <div class="controls">
+
+      <label>Players:
+        <select id="playerCount">
+          <option value="2" selected>2 (You + 1 AI)</option>
+          <option value="3">3 (You + 2 AIs)</option>
+          <option value="4">4 (You + 3 AIs)</option>
+        </select>
+      </label>
+      <button id="btnStart" class="startBtn">Start</button>
+
+      <label>Difficulty:
+        <select id="difficulty">
+          <option value="easy">Easy</option>
+          <option value="normal" selected>Normal</option>
+          <option value="hard">Hard</option>
+        </select>
+      </label>
+
+      <div class="spacer"></div>
+
+      <div class="ctaRow">
+        <button id="btnDraw" class="cta ghost">Draw</button>
+        <button id="btnFinish" class="cta ghost">Finish</button>
+      </div>
+
+      <button id="btnReset">Reset</button>
+      <button id="btnPass">Pass</button>
+
+      <div class="info" id="infoLine">Ready.</div>
+    </div>
+  </div>
+
+  <div class="piles">
+    <div class="col">
+      <h3>Left Pile <span class="pill">♠ / ♥</span></h3>
+      <div class="pileBox" id="boxLeft">
+        <div class="pileTop"><div id="leftTop"></div></div>
+        <div class="status" id="leftStatus"></div>
+        <div class="counts" id="leftCounts"></div>
+      </div>
+    </div>
+    <div class="col">
+      <h3>Right Pile <span class="pill">♣ / ♦</span></h3>
+      <div class="pileBox" id="boxRight">
+        <div class="pileTop"><div id="rightTop"></div></div>
+        <div class="status" id="rightStatus"></div>
+        <div class="counts" id="rightCounts"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="handCol">
+      <div class="handHead">
+        <h3>Your Hand <span id="handCount" class="pill">0</span></h3>
+        <div class="handBadges"><span id="windowBadge" class="pill small">—</span></div>
+      </div>
+
+      <div class="handViewport" id="handViewport">
+        <div class="handGrid" id="handGrid"></div>
+      </div>
+      <div class="handPager">
+        <button id="pagerPrev" class="navBtn" aria-label="Previous 6 cards">⟨</button>
+        <button id="pagerNext" class="navBtn" aria-label="Next 6 cards">⟩</button>
+      </div>
+
+      <div class="hint" id="hint"></div>
+    </div>
+
+    <div class="logCol">
+      <div class="logHead">
+        <h3 style="margin:0">Log</h3>
+        <span id="deckCount" class="small"></span>
+      </div>
+      <div class="log" id="log"></div>
+      <div class="counts" id="aiCounts"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/*** Error logger ***/
+window.addEventListener('error', e => {
+  const el=document.getElementById('log'); if(!el) return;
+  const d=document.createElement('div'); d.style.color='#ff9595';
+  d.innerHTML='[JS ERROR] '+e.message+' <small>@'+(e.filename||'')+':'+(e.lineno||'')+':'+(e.colno||'')+'</small>';
+  el.appendChild(d); el.scrollTop=el.scrollHeight;
+});
+
+/*** ===== Core game state ===== ***/
+const SUITS=['S','H','D','C'];
+const SYM={S:'♠',H:'♥',D:'♦',C:'♣'};
+let players=[], deck=[], piles={left:{status:'active',top:null,stack:[]}, right:{status:'active',top:null,stack:[]}};
+let running=false, autoDrawTimer=null, turnTick=0, DIFF='normal';
+
+/* Random turn order every game (human is players[0], but order is shuffled) */
+let turnOrder=[], turnPos=0, current=0;
+
+/*** Selection & view state ***/
+let staged=[], stagedPile=null;
+const PAGE_SIZE=6; let pageStart=0;
+let viewFrozen=false, viewPile=null, orderIds=[], anchorPos={};
+let lastDrawIds=[];
+
+/*** AI flow safety ***/
+let aiBusy=false;
+let _aiWatchdog=null;
+let _aiPump=null;
+
+/*** Timers / guard against stale timeouts ***/
+let GAME_EPOCH=0; const _timers=new Set();
+function schedule(cb, ms){ const epoch=GAME_EPOCH; const id=setTimeout(()=>{ _timers.delete(id); if(epoch!==GAME_EPOCH) return; cb(epoch); }, ms); _timers.add(id); return id; }
+function cancelAllTimers(){ for(const id of _timers){ clearTimeout(id); } _timers.clear(); if(_aiWatchdog){ clearTimeout(_aiWatchdog); _aiWatchdog=null; } if(_aiPump){ clearInterval(_aiPump); _aiPump=null; } }
+function bumpEpoch(){ GAME_EPOCH++; cancelAllTimers(); stopAuto(); lastDrawIds=[]; aiBusy=false; }
+
+/*** Utils ***/
+const $=id=>document.getElementById(id);
+function log(msg){ const el=$('log'); if(!el) return; const d=document.createElement('div'); d.innerHTML=msg; el.appendChild(d); el.scrollTop=el.scrollHeight; }
+function clearLog(){ const el=$('log'); if(el){ el.innerHTML=''; el.scrollTop=0; } }
+const setInfo=t=>{ const el=$('infoLine'); if(el) el.textContent=t; };
+const lbl=r=>(r<=10? String(r):({11:'J',12:'Q',13:'K',14:'A'}[r]));
+const grp=s=>(s==='S'||s==='H')?'left':'right';
+const opp=s=>({S:'H',H:'S',C:'D',D:'C'})[s];
+const cstr=c=>lbl(c.rank)+SYM[c.suit];
+
+function makeDeck(){ const d=[]; for(const s of SUITS){ for(let r=2;r<=14;r++) d.push({suit:s,rank:r,id:s+r+Math.random().toString(36).slice(2,7)}); } return d; }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+const draw=()=> deck.length? deck.pop(): null;
+function sortHand(h){
+  h.sort((a,b)=>{
+    const g1=grp(a.suit)==='left'?0:1, g2=grp(b.suit)==='left'?0:1;
+    if(g1!==g2) return g1-g2;
+    if(a.rank!==b.rank) return a.rank-b.rank;
+    return ['S','H','D','C'].indexOf(a.suit)-['S','H','D','C'].indexOf(b.suit);
+  });
+}
+const aceLimit=()=> players.length===2?2:1;
+const aceCount=h=> h.reduce((n,c)=>n+(c.rank===14),0);
+
+/*** Deck integrity ***/
+function uniqueDeck(){ const seen=new Set(), clean=[]; for(const c of deck){ if(!seen.has(c.id)){ seen.add(c.id); clean.push(c); } } deck=clean.slice(0,52); }
+function buryIntoDeck(cards){ const block=shuffle(cards.slice()); deck=block.concat(deck); uniqueDeck(); }
+
+/*** Seeding helpers ***/
+function takeFirst(pred){ for(let i=0;i<deck.length;i++){ if(pred(deck[i])) return deck.splice(i,1)[0]; } return null; }
+const takeSpecific=(suit,rank)=>takeFirst(c=> c.suit===suit && c.rank===rank);
+
+/*** Piles ***/
+function initPilesByDifficulty(){
+  piles.left={status:'active',top:null,stack:[]};
+  piles.right={status:'active',top:null,stack:[]};
+
+  if(DIFF==='easy'){
+    let twoS=takeSpecific('S',2), twoC=takeSpecific('C',2);
+    if(!twoS){ twoS=takeFirst(c=>(c.suit==='S'||c.suit==='H')&&c.rank===2)||takeFirst(c=>(c.suit==='S'||c.suit==='H')); }
+    if(!twoC){ twoC=takeFirst(c=>(c.suit==='C'||c.suit==='D')&&c.rank===2)||takeFirst(c=>(c.suit==='C'||c.suit==='D')); }
+    piles.left.top=twoS;  piles.left.stack=twoS?[twoS]:[];
+    piles.right.top=twoC; piles.right.stack=twoC?[twoC]:[];
+  } else if(DIFF==='normal'){
+    const right=takeFirst(c=> (c.suit==='C'||c.suit==='D') && c.rank>=2 && c.rank<=10) || takeFirst(c=> (c.suit==='C'||c.suit==='D') && c.rank<=10 && c.rank!==14);
+    const left =takeFirst(c=> (c.suit==='S'||c.suit==='H') && c.rank>=2 && c.rank<=10) || takeFirst(c=> (c.suit==='S'||c.suit==='H') && c.rank<=10 && c.rank!==14);
+    piles.right.top=right; piles.right.stack=right?[right]:[];
+    piles.left.top=left;   piles.left.stack=left?[left]:[];
+  } else { // hard: any non-ace
+    const r=takeFirst(c=> (c.suit==='C'||c.suit==='D') && c.rank!==14);
+    const l=takeFirst(c=> (c.suit==='S'||c.suit==='H') && c.rank!==14);
+    piles.right.top=r; piles.right.stack=r?[r]:[];
+    piles.left.top=l;  piles.left.stack=l?[l]:[];
+  }
+
+  // Fallback seeding (rare)
+  let safe=24, d;
+  while((!piles.left.top || !piles.right.top) && safe--){
+    d=draw(); if(!d) break;
+    if(!piles.left.top && (d.suit==='S'||d.suit==='H') && (DIFF!=='hard' || d.rank!==14)){ piles.left.top=d; piles.left.stack=[d]; }
+    else if(!piles.right.top && (d.suit==='C'||d.suit==='D') && (DIFF!=='hard' || d.rank!==14)){ piles.right.top=d; piles.right.stack=[d]; }
+    else deck.unshift(d);
+  }
+  log('Seeded ('+DIFF+'): Left '+(piles.left.top?cstr(piles.left.top):'—')+' | Right '+(piles.right.top?cstr(piles.right.top):'—'));
+}
+
+/*** Start/Deal/Turn order ***/
+function deal(n,cnt){
+  for(let i=0;i<n;i++){
+    players[i].hand=[];
+    for(let j=0;j<cnt;j++){ const c=draw(); if(c) players[i].hand.push(c); }
+  }
+  players.forEach(p=>sortHand(p.hand));
+}
+function buildTurnOrder(n){
+  turnOrder = Array.from({length:n}, (_,i)=>i);
+  for(let i=n-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [turnOrder[i],turnOrder[j]]=[turnOrder[j],turnOrder[i]]; }
+  turnPos = 0;
+  current  = turnOrder[0];
+}
+function startGame(){
+  const startEl = $('btnStart'); if(startEl) startEl.disabled = true;
+  try{
+    $('btnDraw').disabled=true; $('btnFinish').disabled=true;
+    clearLog(); bumpEpoch();
+    running=true; staged=[]; stagedPile=null; viewFrozen=false; viewPile=null; orderIds=[]; anchorPos={}; pageStart=0; turnTick=0; lastDrawIds=[];
+    DIFF = $('difficulty').value || 'normal';
+    deck=shuffle(makeDeck()); uniqueDeck();
+
+    players=[]; const n=parseInt($('playerCount').value||'2',10)||2;
+    players.push({id:0,name:'You',isAI:false,hand:[]});
+    for(let i=1;i<n;i++) players.push({id:i,name:'AI '+i,isAI:true,hand:[]});
+
+    initPilesByDifficulty();
+    deal(n,7);
+
+    buildTurnOrder(n);
+    setInfo(`Game started (${DIFF}). First: ${players[current].name}.`);
+    renderAll();
+    aiBusy=false;
+    maybeAI();
+    startAIPump(); // periodic safety nudge
+  }catch(err){ log('<b style="color:#ff9595">Start error:</b> '+err.message); }
+  finally{ if(startEl) setTimeout(()=>startEl.disabled=false, 250); }
+}
+
+/*** Rules ***/
+const canAceOn=(pid,c)=> c.rank===14 && ((pid==='left' && (c.suit==='S'||c.suit==='H')) || (pid==='right' && (c.suit==='C'||c.suit==='D')));
+function firstLegal(pid,c){
+  if(canAceOn(pid,c)) return true;
+  const pile=piles[pid]; if(pile.status==='closed') return false;
+  if(pile.status==='empty') return grp(c.suit)===pid;
+  const top=pile.top; if(!top) return false;
+  if(grp(c.suit)!==pid) return false;
+  if(opp(top.suit)!==c.suit) return false;
+  return c.rank>=top.rank;
+}
+function nextLegal(pid,prev,next){
+  if(grp(next.suit)!==pid) return false;
+  if(opp(prev.suit)!==next.suit) return false;
+  return next.rank===prev.rank+1;
+}
+
+/*** Priority view ***/
+const currentHandIds=()=> players[0].hand.map(c=>c.id);
+function clampPage(total){ pageStart=Math.max(0, Math.min(pageStart, Math.max(0,total-1) - (PAGE_SIZE-1))); }
+
+function buildOrder(pid){
+  const hand=players[0].hand, ids=currentHandIds(), N=ids.length;
+  for(const id of Object.keys(anchorPos)){ if(!ids.includes(id)) delete anchorPos[id]; }
+  const prev = (orderIds && orderIds.length)? orderIds.slice() : ids.slice();
+
+  const last = staged.length? staged[staged.length-1] : null;
+  const playableSet = new Set();
+  for(const c of hand){ if(!last? firstLegal(pid,c) : nextLegal(pid,last,c)) playableSet.add(c.id); }
+
+  const order = new Array(N).fill(null);
+  const used = new Set();
+
+  const anchors = Object.entries(anchorPos)
+    .map(([id,idx])=>({id,idx:Math.max(0,Math.min(N-1, Number(idx)))}))
+    .sort((a,b)=>a.idx-b.idx);
+
+  const occupy=(desired,id)=>{
+    let i=desired;
+    while(i<N && order[i]!==null) i++;
+    if(i>=N){ i=0; while(i<N && order[i]!==null) i++; if(i>=N) return; }
+    order[i]=id; used.add(id); anchorPos[id]=i;
+  };
+  for(const a of anchors){ if(ids.includes(a.id)) occupy(a.idx,a.id); }
+
+  const remaining = prev.filter(id=> ids.includes(id) && !used.has(id));
+  const playables = remaining.filter(id=> playableSet.has(id));
+  const rest      = remaining.filter(id=> !playableSet.has(id));
+
+  let p=0, r=0;
+  for(let i=0;i<N;i++){
+    if(order[i]!==null) continue;
+    if(p<playables.length){ order[i]=playables[p++]; used.add(order[i]); continue; }
+    if(r<rest.length){ order[i]=rest[r++]; used.add(order[i]); continue; }
+  }
+
+  const seen=new Set();
+  orderIds = order.filter(id=> id!=null && !seen.has(id) && seen.add(id));
+  clampPage(orderIds.length);
+}
+function enterPriority(pid){ viewFrozen=true; viewPile=pid; anchorPos={}; buildOrder(pid); pageStart=0; }
+function updatePriority(){ if(viewFrozen && viewPile) buildOrder(viewPile); }
+function clearPriority(){ viewFrozen=false; viewPile=null; orderIds=[]; anchorPos={}; }
+
+/*** While drawing: turn off priority and deselect pile ***/
+function disablePriorityForDraw(){
+  clearPriority();
+  staged=[];       // no partial stack while drawing
+  stagedPile=null; // deselect pile
+}
+
+/*** Focus helpers (normal hand view) ***/
+function focusNewestDraw(){
+  const you=players[0];
+  if(!you || !you.hand) return;
+  if(lastDrawIds.length===0) return;
+  const ids=new Map(you.hand.map((c,i)=>[c.id,i]));
+  for(const id of lastDrawIds){
+    if(ids.has(id)){ const i=ids.get(id); pageStart=Math.floor(i/PAGE_SIZE)*PAGE_SIZE; break; }
+  }
+}
+function focusPlayableOrNewest(){
+  const you=players[0];
+  const playableIds=new Set();
+  for(const c of you.hand){ if(firstLegal('left',c) || firstLegal('right',c)) playableIds.add(c.id); }
+  if(playableIds.size){
+    const idx=you.hand.findIndex(c=>playableIds.has(c.id));
+    if(idx>=0){ pageStart=Math.floor(idx/PAGE_SIZE)*PAGE_SIZE; return; }
+  }
+  focusNewestDraw();
+}
+
+/*** UI helpers ***/
+function cardEl(c){
+  const d=document.createElement('div');
+  d.className='card '+((c.suit==='H'||c.suit==='D')?'red':'black');
+  const r=document.createElement('div'); r.className='rank'; r.textContent=lbl(c.rank);
+  const s=document.createElement('div'); s.className='suit'; s.textContent=SYM[c.suit];
+  d.appendChild(r); d.appendChild(s); return d;
+}
+function renderPile(pid){
+  const topEl=$(pid==='left'?'leftTop':'rightTop');
+  const stEl=$(pid==='left'?'leftStatus':'rightStatus');
+  const box=$(pid==='left'?'boxLeft':'boxRight');
+  if(!topEl||!stEl||!box) return;
+  topEl.innerHTML=''; stEl.innerHTML='';
+  const pile=piles[pid];
+  if(pile.status==='active' && pile.top){
+    topEl.appendChild(cardEl(pile.top));
+    stEl.innerHTML='Top: <b>'+cstr(pile.top)+'</b>';
+  } else if(pile.status==='closed'){
+    stEl.innerHTML='<span>Finished (Ace). Reopens next player.</span>';
+  } else {
+    stEl.innerHTML='<span>Empty — start with any '+(pid==='left'?'♠/♥':'♣/♦')+'.</span>';
+  }
+  box.className=(players[current] && players[current].id===0 && stagedPile===pid)?'pileBox sel':'pileBox';
+}
+
+/*** CTA & hand rendering ***/
+function anyPlayableNonAce(i){ const h=players[i].hand; for(const c of h){ if(c.rank===14) continue; if(firstLegal('left',c)||firstLegal('right',c)) return true; } return false; }
+function anyPlayableInclAce(i){ const h=players[i].hand; for(const c of h){ if(firstLegal('left',c)||firstLegal('right',c)) return true; } return false; }
+function hasStackable(){ if(!stagedPile || staged.length===0) return false; const prev=staged[staged.length-1]; for(const c of players[0].hand){ if(nextLegal(stagedPile,prev,c)) return true; } return false; }
+function canUseDraw(){
+  if(!running) return false;
+  if(players[current].id!==0) return false;
+  if(staged.length>0) return false;
+  if(aceCount(players[0].hand)>aceLimit()) return false;
+  if(anyPlayableInclAce(0)) return false;
+  if(deck.length===0) return false;
+  return true;
+}
+function setCTA(btn, enable, style){ btn.disabled=!enable; btn.classList.remove('primary','primaryLight','ghost'); btn.classList.add(style); }
+function updateCTAs(){
+  const drawBtn=$('btnDraw'), finBtn=$('btnFinish');
+  const yourTurn=(players[current] && players[current].id===0 && running);
+  const canDraw=canUseDraw();
+  const canFinish= yourTurn && staged.length>0;
+  const stackable = hasStackable();
+
+  setCTA(drawBtn, canDraw, canDraw? 'primary' : 'ghost');
+  if(canFinish){ setCTA(finBtn, true, stackable? 'primaryLight' : 'primary'); }
+  else { setCTA(finBtn, false, 'ghost'); }
+}
+
+function updateWindowBadge(total,note){
+  const b=$('windowBadge');
+  const start = total? (pageStart+1) : 0;
+  const end   = total? Math.min(total, pageStart+PAGE_SIZE) : 0;
+  b.textContent = total? `${start}–${end} / ${total}${note?(' • '+note):''}` : '—';
+}
+
+function renderHand(){
+  const grid=$('handGrid'); if(!grid) return;
+  grid.innerHTML='';
+  const you=players[0]||{hand:[]};
+  $('handCount').textContent=you.hand.length;
+
+  const yourTurn=(players[current] && players[current].id===0 && running);
+  if(yourTurn && viewFrozen) updatePriority();
+
+  const canIds={};
+  if(yourTurn && stagedPile){
+    const forceAce = aceCount(you.hand)>aceLimit();
+    for(const c of you.hand){
+      if(forceAce){
+        if(staged.length===0 && c.rank===14 && canAceOn(stagedPile,c)) canIds[c.id]=1;
+      } else if(staged.length===0){
+        if(firstLegal(stagedPile,c)) canIds[c.id]=1;
+      } else {
+        const prev=staged[staged.length-1];
+        if(nextLegal(stagedPile,prev,c)) canIds[c.id]=1;
+      }
+    }
+  }
+
+  const mapping=new Map(you.hand.map(c=>[c.id,c]));
+  const list = (viewFrozen ? orderIds.map(id=>mapping.get(id)).filter(Boolean) : you.hand.slice());
+
+  for(let i=pageStart;i<pageStart+PAGE_SIZE && i<list.length;i++){
+    const cc=list[i], el=cardEl(cc);
+    if(staged.some(x=>x.id===cc.id)) el.className+=' chosen';
+    const ok=!!canIds[cc.id];
+    if(yourTurn && ok){ el.className+=' clickable'; el.addEventListener('click', ()=>pickCard(cc)); }
+    else el.className+=' disabled';
+    grid.appendChild(el);
+  }
+
+  $('pagerPrev').disabled = (pageStart<=0);
+  $('pagerNext').disabled = (pageStart+PAGE_SIZE >= list.length);
+  updateWindowBadge(list.length, viewFrozen?'priority view':'');
+}
+
+/*** Counts & composite render ***/
+function renderCounts(){
+  $('deckCount').textContent='Draw pile: '+deck.length+' cards';
+  let s='Opponents: ', first=true;
+  for(let i=1;i<players.length;i++){ s+=(first?'':' | ')+players[i].name+': '+(players[i].hand?players[i].hand.length:0); first=false; }
+  $('aiCounts').textContent=s;
+}
+function renderAll(){
+  renderPile('left'); renderPile('right'); renderHand(); renderCounts();
+  updateCTAs();
+}
+
+/*** Player actions ***/
+function selectPile(pid){
+  if(!running) return;
+  if(players[current].id!==0) return;
+  if(piles[pid].status==='closed') return;
+  if(staged.length>0 && pid!==stagedPile){ setInfo('Finish/Reset before switching piles.'); return; }
+
+  staged=[]; stagedPile=pid; pageStart=0;
+  enterPriority(pid);
+  renderAll();
+}
+function pickCard(c){
+  if(!stagedPile) return;
+  if(staged.length===0){ if(!firstLegal(stagedPile,c)) return; }
+  else { const prev=staged[staged.length-1]; if(!nextLegal(stagedPile,prev,c)) return; }
+  staged.push(c);
+
+  if(!viewFrozen) enterPriority(stagedPile);
+  if(!orderIds.length){ buildOrder(stagedPile); }
+  const currentIndex = orderIds.indexOf(c.id);
+  if(currentIndex>=0 && anchorPos[c.id]===undefined) anchorPos[c.id]=currentIndex;
+
+  updatePriority();
+
+  const earliest = Math.min(...Object.values(anchorPos).map(Number));
+  if(isFinite(earliest)) pageStart = Math.floor(earliest / PAGE_SIZE) * PAGE_SIZE;
+
+  renderAll();
+}
+function onReset(){ staged=[]; stagedPile=null; pageStart=0; clearPriority(); lastDrawIds=[]; renderAll(); }
+function onPass(){ if(!running || players[current].id!==0) return; if(deck.length===0 && !anyPlayableNonAce(0) && aceCount(players[0].hand)<=aceLimit()){ nextTurn(); } }
+
+/*** Draw (auto) — priority view OFF while drawing ***/
+function onDraw(){
+  if(!canUseDraw()) return;
+  stopAuto();
+  setInfo('Drawing until playable…');
+  lastDrawIds = [];          // new batch
+  disablePriorityForDraw();  // turn off priority and deselect pile during draw
+  autoDrawStep();
+}
+function stopAuto(){ if(autoDrawTimer){ clearTimeout(autoDrawTimer); autoDrawTimer=null; } }
+function autoDrawStep(){
+  if(!running || players[current].id!==0){ stopAuto(); return; }
+  if(aceCount(players[0].hand)>aceLimit()){
+    stopAuto(); renderAll();
+    log('<span>Forced Ace: select a pile and place it.</span>');
+    setInfo('');
+    return;
+  }
+
+  if(anyPlayableInclAce(0)){
+    focusPlayableOrNewest();
+    setInfo('Playable card found. Pick a pile to play.');
+    renderAll();
+    stopAuto();
+    return;
+  }
+
+  if(deck.length===0){
+    stopAuto(); setInfo('Deck empty.'); renderAll(); return;
+  }
+
+  const c = draw();
+  if(c){
+    players[0].hand.push(c);
+    lastDrawIds.push(c.id);
+    sortHand(players[0].hand);
+    log('<span>You</span> drew a card.');
+    focusPlayableOrNewest();
+    renderAll();
+
+    if(anyPlayableInclAce(0)){
+      focusPlayableOrNewest();
+      setInfo('Playable card found. Pick a pile to play.');
+      renderAll();
+      stopAuto();
+      return;
+    }
+  }
+
+  autoDrawTimer = schedule(()=>autoDrawStep(), 140);
+}
+
+/*** Apply a move / turns ***/
+function commitMove(){
+  const me=players[0];
+  if(staged.length===0 || !stagedPile){ setInfo('Select a pile and at least one card.'); return; }
+  const mustAce = aceCount(me.hand)>aceLimit();
+  if(mustAce && !(staged.length===1 && staged[0].rank===14)){ log('<span>You must place an Ace now.</span>'); return; }
+  const pile=piles[stagedPile]; let finished=false, s='';
+  for(let i=0;i<staged.length;i++){
+    const c=staged[i]; s+=(i?' → ':'')+cstr(c);
+    const idx=me.hand.findIndex(x=>x.id===c.id); if(idx>=0) me.hand.splice(idx,1);
+    if(c.rank===14){ finishPile(stagedPile, c, 'You'); finished=true; break; }
+    else { pile.top=c; pile.status='active'; pile.stack.push(c); }
+  }
+  if(!finished) log('<b>You</b> played: '+s+' on <b>'+stagedPile+'</b>.');
+  staged=[]; stagedPile=null; pageStart=0; sortHand(me.hand);
+  clearPriority(); lastDrawIds=[];
+  if(me.hand.length===0){ endGame('You'); return; }
+  nextTurn();
+}
+function finishPile(pid, aceCard, whoName){
+  const pile=piles[pid];
+  const finished=pile.stack.slice(0); if(aceCard) finished.push(aceCard);
+  buryIntoDeck(finished);
+  pile.status='closed'; pile.top=null; pile.stack=[];
+  renderCounts();
+  log('<b>'+whoName+'</b> finished <b>'+pid+'</b> with '+cstr(aceCard)+'. Cards buried; deck '+deck.length+'.');
+}
+function endGame(name){
+  running=false; cancelAllTimers(); renderAll(); setInfo('');
+  log('<span style="color:#7fd37f"><b>'+name+'</b> wins!</span>');
+}
+
+/* Advance strictly by our (randomized) turnOrder */
+function nextTurn(){
+  for(const pid in piles){ if(piles[pid].status==='closed') piles[pid].status='empty'; }
+  turnPos = (turnPos + 1) % turnOrder.length;
+  current = turnOrder[turnPos];
+  turnTick++;
+  setInfo(`Turn: ${players[current].name}.`);
+  clearPriority(); lastDrawIds=[];
+  renderAll();
+  aiBusy=false;
+  maybeAI();
+}
+
+/*** ====== AI reliability helpers ====== ***/
+function clearAIWatchdog(){ if(_aiWatchdog){ clearTimeout(_aiWatchdog); _aiWatchdog=null; } }
+function armAIWatchdog(idx){
+  clearAIWatchdog();
+  const tickAtArm = turnTick;
+  _aiWatchdog = schedule(()=>{
+    if(running && current === idx && turnTick === tickAtArm){
+      log('<span style="color:#9aa3b2">[watchdog] nudging '+players[idx].name+'…</span>');
+      if(!aiBusy){ aiBusy=true; aiTurn(idx); }
+    }
+  }, 1500);
+}
+function startAIPump(){
+  if(_aiPump) clearInterval(_aiPump);
+  _aiPump = setInterval(()=>{
+    if(!running) return;
+    const idx=current, p=players[idx];
+    if(p && p.isAI && !aiBusy){
+      aiBusy=true;
+      aiTurn(idx);
+    }
+  }, 1200);
+}
+
+/*** AI orchestration ***/
+function maybeAI(){
+  if(!running) return;
+  const idx = current;
+  const p = players[idx];
+  if(!p || !p.isAI){ clearAIWatchdog(); return; }
+  if(aiBusy) return;
+  aiBusy=true;
+  schedule(()=>aiTurn(idx), 180);
+  armAIWatchdog(idx);
+}
+
+function sequencesForPid(me, pid){
+  if(piles[pid].status==='closed') return [];
+  const seqs=[], h=me.hand;
+  function buildSeq(start){
+    const seq=[start], used=new Set([start.id]); let req=opp(start.suit), last=start.rank, cand;
+    while(true){
+      cand=null;
+      for(const c of h){
+        if(used.has(c.id)) continue;
+        if(c.rank===14) continue;
+        if(grp(c.suit)!==pid) continue;
+        if(c.suit!==req) continue;
+        if(c.rank!==last+1) continue;
+        cand=c; break;
+      }
+      if(!cand) break;
+      seq.push(cand); used.add(cand.id); last=cand.rank; req=opp(req);
+    }
+    return seq;
+  }
+  for(const st of h){ if(st.rank!==14 && firstLegal(pid,st)) seqs.push(buildSeq(st)); }
+  if(piles[pid].status==='empty'){ for(const st2 of h){ if(st2.rank!==14 && grp(st2.suit)===pid) seqs.push(buildSeq(st2)); } }
+  return seqs;
+}
+
+/* Single best high non-ace for a pile (Hard fallback) */
+function bestSingleForPid(me, pid){
+  let best=null;
+  for(const c of me.hand){
+    if(c.rank===14) continue;
+    if(firstLegal(pid,c)){
+      if(!best || c.rank>best.rank) best=c;
+    }
+  }
+  return best;
+}
+
+function hasLegalAce(me){
+  for(const c of me.hand){ if(c.rank===14){ const pid=grp(c.suit); if(piles[pid].status!=='closed') return {card:c,pile:pid}; } }
+  return null;
+}
+
+function aiChoose(i){
+  const me=players[i], limit=aceLimit();
+  if(aceCount(me.hand)>limit){ const forced=hasLegalAce(me); if(forced) return {type:'ace', card:forced.card, pile:forced.pile}; }
+  if(DIFF==='easy') return aiEasy(i);
+  if(DIFF==='hard') return aiHard(i);
+  return (Math.random()<0.5)? aiEasy(i) : aiHard(i);
+}
+
+function aiEasy(i){
+  const me=players[i];
+  const ace=hasLegalAce(me); if(ace) return {type:'ace', card:ace.card, pile:ace.pile};
+  const pids = (turnTick%2===0)?['left','right']:['right','left'];
+  let best=null, bestScore=1e9;
+  for(const pid of pids){
+    const seqs=sequencesForPid(me,pid);
+    for(const seq of seqs){
+      const start=seq[0].rank, end=seq[seq.length-1].rank, len=seq.length;
+      const score = end + start*0.5 - len*2; // prefer small + long runs
+      if(score<bestScore || (score===bestScore && Math.random()<0.5)){ bestScore=score; best={type:'play', pile:pid, seq:seq}; }
+    }
+  }
+  if(best) return best;
+  if(!anyPlayableInclAce(i)) return deck.length? {type:'draw'} : {type:'pass'};
+  return {type:'draw'};
+}
+
+/* HARD: Always play a run if any exists; choose highest-ending, then longer. */
+function aiHard(i){
+  const me = players[i];
+
+  // Prefer runs (length >= 2) on either pile; choose by highest end rank, then longer.
+  let bestRun=null, bestPile=null, bestEnd=-1, bestLen=-1;
+  for (const pid of (turnTick % 2 === 0 ? ['left','right'] : ['right','left'])) {
+    const seqs = sequencesForPid(me, pid);
+    for (const seq of seqs) {
+      if (seq.length < 2) continue;
+      const end = seq[seq.length - 1].rank;
+      if (end > bestEnd || (end === bestEnd && seq.length > bestLen)) {
+        bestEnd = end; bestLen = seq.length; bestRun = seq; bestPile = pid;
+      }
+    }
+  }
+  if (bestRun) return { type:'play', pile:bestPile, seq:bestRun };
+
+  // No run: single best high non-Ace on either pile.
+  const sL = bestSingleForPid(me, 'left');
+  const sR = bestSingleForPid(me, 'right');
+  if (sL && sR) return (sL.rank >= sR.rank)
+    ? { type:'play', pile:'left',  seq:[sL] }
+    : { type:'play', pile:'right', seq:[sR] };
+  if (sL) return { type:'play', pile:'left',  seq:[sL] };
+  if (sR) return { type:'play', pile:'right', seq:[sR] };
+
+  // Only possible play might be an Ace, or nothing at all.
+  const ace = hasLegalAce(me);
+
+  if (!ace && !anyPlayableInclAce(i)){
+    return deck.length ? {type:'draw'} : {type:'pass'};
+  }
+
+  // There is a legal Ace. Hard holds it unless it must use it.
+  const someoneLow = players.some((p, idx) => idx !== i && p.hand && p.hand.length <= 2);
+  const nonAcePlayable = anyPlayableNonAce(i);
+  if (!nonAcePlayable || deck.length === 0 || someoneLow) {
+    return { type:'ace', card: ace.card, pile: ace.pile };
+  }
+
+  // Otherwise, sometimes draw to fish for a run; else play Ace.
+  return (Math.random() < 0.35 && deck.length > 0) ? { type:'draw' } : { type:'ace', card: ace.card, pile: ace.pile };
+}
+
+function aiTurn(i){
+  if(!running || current!==i){ aiBusy=false; return; }
+  armAIWatchdog(i);
+  const me=players[i], mv=aiChoose(i);
+
+  if(mv.type==='play'){
+    const pile=piles[mv.pile], seq=mv.seq; let finished=false;
+    for(const c of seq){
+      const rm=me.hand.findIndex(x=>x.id===c.id); if(rm>=0) me.hand.splice(rm,1);
+      if(c.rank===14){ finishPile(mv.pile, c, me.name); finished=true; break; }
+      else { pile.top=c; pile.status='active'; pile.stack.push(c); }
+    }
+    if(!finished){ log('<b>'+me.name+'</b> played: '+seq.map(cstr).join(' → ')+' on <b>'+mv.pile+'</b>.'); }
+    sortHand(me.hand); renderAll();
+    if(me.hand.length===0){ aiBusy=false; endGame(me.name); return; }
+    aiBusy=false; nextTurn();
+
+  } else if(mv.type==='draw'){
+    let drew=false, safe=60;
+
+    if(anyPlayableInclAce(i)){
+      aiBusy=false;
+      schedule(()=>{ aiBusy=true; aiTurn(i); }, 120);
+      return;
+    }
+
+    while(deck.length && !anyPlayableInclAce(i) && safe--){
+      const d=draw(); if(d){ me.hand.push(d); drew=true; }
+    }
+    if(drew){ sortHand(me.hand); log('<b>'+me.name+'</b> drew.'); renderAll(); }
+
+    if(anyPlayableInclAce(i)){
+      aiBusy=false; schedule(()=>{ aiBusy=true; aiTurn(i); }, 120);
+      return;
+    }
+
+    if(deck.length===0){ log('<b>'+me.name+'</b> passes.'); aiBusy=false; nextTurn(); }
+    else { aiBusy=false; schedule(()=>{ aiBusy=true; aiTurn(i); }, 180); armAIWatchdog(i); }
+
+  } else if(mv.type==='ace'){
+    const a=mv.card, pid=mv.pile;
+    const rm=me.hand.findIndex(x=>x.id===a.id); if(rm>=0) me.hand.splice(rm,1);
+    finishPile(pid, a, me.name);
+    renderAll();
+    if(me.hand.length===0){ aiBusy=false; endGame(me.name); return; }
+    aiBusy=false; nextTurn();
+
+  } else { log('<b>'+me.name+'</b> passes.'); aiBusy=false; nextTurn(); }
+}
+
+/*** Bind ***/
+function bindUI(){
+  $('btnStart').addEventListener('click', startGame);
+  $('btnDraw').addEventListener('click', onDraw);
+  $('btnFinish').addEventListener('click', commitMove);
+  $('btnReset').addEventListener('click', onReset);
+  $('btnPass').addEventListener('click', onPass);
+  $('boxLeft').addEventListener('click', ()=>selectPile('left'));
+  $('boxRight').addEventListener('click', ()=>selectPile('right'));
+  $('pagerPrev').addEventListener('click', ()=>{ pageStart=Math.max(0, pageStart-PAGE_SIZE); renderAll(); });
+  $('pagerNext').addEventListener('click', ()=>{
+    const total = viewFrozen? orderIds.length : (players[0]? players[0].hand.length:0);
+    if(pageStart+PAGE_SIZE<total){ pageStart+=PAGE_SIZE; renderAll(); }
+  });
+}
+bindUI(); renderAll(); log('<i>Ready. Tap Start.</i>');
+</script>
+</body>
+</html>
